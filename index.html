@@ -95,6 +95,15 @@
             </div>
             
             <div id="nav-actions" class="hidden flex items-center gap-4">
+                
+                <!-- Bildirim Çanı (Bell Icon) -->
+                <div id="nav-bell-container" class="relative cursor-pointer mr-1 md:mr-2" onclick="app.openNotifications()" title="Bildirimler">
+                    <i class="fa-solid fa-bell text-gray-300 hover:text-white transition-colors text-xl"></i>
+                    <!-- Kırmızı Nokta -->
+                    <span id="bell-dot-ping" class="hidden absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-ping"></span>
+                    <span id="bell-dot-static" class="hidden absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border border-black"></span>
+                </div>
+
                 <div class="hidden md:flex items-center gap-3 mr-2 cursor-pointer hover:bg-white/5 p-1.5 rounded-lg transition-colors" onclick="app.navigate('profile')">
                     <img id="nav-avatar" src="" alt="Avatar" class="w-9 h-9 rounded-full border border-sky-500 object-cover shadow-[0_0_10px_rgba(14,165,233,0.3)] hidden">
                     <div class="flex flex-col items-end">
@@ -176,7 +185,7 @@
                     <h1 class="text-3xl md:text-5xl museum-font font-bold mb-2 azure-gradient">Antik Müze</h1>
                 </div>
                 <div class="relative w-full md:w-auto">
-                    <input type="text" id="search-input" placeholder="Arşivde ara..." class="w-full md:w-64 input-azure rounded-full py-2 px-4 pl-10 text-sm">
+                    <input type="text" id="search-input" placeholder="Arşivde veya Etiketlerde ara..." class="w-full md:w-72 input-azure rounded-full py-2 px-4 pl-10 text-sm">
                     <i class="fa-solid fa-magnifying-glass absolute left-4 top-2.5 text-sky-500 text-sm"></i>
                 </div>
             </div>
@@ -193,7 +202,7 @@
             
             <div id="empty-state" class="hidden flex-col items-center justify-center py-20 text-center glass-panel rounded-2xl">
                 <i class="fa-solid fa-ghost text-6xl text-sky-900 mb-4 opacity-70"></i>
-                <h3 class="text-xl text-gray-300 mb-2 font-semibold">Arşivde Kayıt Yok</h3>
+                <h3 class="text-xl text-gray-300 mb-2 font-semibold">Aramanıza uygun veya Arşivde kayıt yok</h3>
             </div>
         </div>
 
@@ -215,9 +224,15 @@
                             <h2 id="profile-page-name" class="text-4xl museum-font font-bold text-white mb-2"></h2>
                             <p id="profile-page-role" class="text-sky-400 font-semibold tracking-wider uppercase text-sm mb-4"></p>
                         </div>
-                        <button onclick="document.getElementById('avatar-edit-section').classList.toggle('hidden')" class="bg-sky-900/40 hover:bg-sky-800/60 border border-sky-700/50 text-sky-200 px-4 py-2 rounded-lg text-sm transition-colors flex items-center justify-center gap-2 mx-auto md:mx-0">
-                            <i class="fa-solid fa-image"></i> Resmi Değiştir
-                        </button>
+                        <div class="flex flex-col gap-2 mx-auto md:mx-0 w-full md:w-auto">
+                            <button onclick="document.getElementById('avatar-edit-section').classList.toggle('hidden')" class="bg-sky-900/40 hover:bg-sky-800/60 border border-sky-700/50 text-sky-200 px-4 py-2 rounded-lg text-sm transition-colors flex items-center justify-center gap-2 w-full">
+                                <i class="fa-solid fa-image"></i> Resmi Değiştir
+                            </button>
+                            <!-- Hesap Silme Butonu -->
+                            <button onclick="app.promptDeleteAccount()" class="bg-red-900/40 hover:bg-red-800/60 border border-red-700/50 text-red-200 px-4 py-2 rounded-lg text-sm transition-colors flex items-center justify-center gap-2 w-full">
+                                <i class="fa-solid fa-trash-can"></i> Hesabımı Sil
+                            </button>
+                        </div>
                     </div>
 
                     <div id="avatar-edit-section" class="hidden mt-4 bg-black/40 p-4 rounded-xl border border-gray-800">
@@ -338,7 +353,7 @@
 
                     <div>
                         <label class="block text-sm font-medium text-gray-300 mb-1 ml-1">Etiketler (Virgülle Ayırın)</label>
-                        <input type="text" id="edit-tags" placeholder="Örn: Karakter, Olay, Mekan" class="w-full input-azure rounded-xl p-4 text-sm font-medium placeholder-gray-600">
+                        <input type="text" id="edit-tags" placeholder="Örn: Efsaneler, Toplantı, Skandal" class="w-full input-azure rounded-xl p-4 text-sm font-medium placeholder-gray-600">
                     </div>
                     
                     <div>
@@ -370,11 +385,33 @@
 
     </main>
 
-    <!-- Custom Modal -->
+    <!-- Bildirimler Modal (Kalıcı ve Offline Listesi) -->
+    <div id="notifications-modal" class="hidden fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onclick="app.closeNotifications(event)">
+        <div class="glass-panel p-0 rounded-2xl shadow-2xl max-w-sm w-full border border-gray-700 flex flex-col max-h-[80vh] overflow-hidden" onclick="event.stopPropagation()">
+            <div class="p-4 border-b border-gray-800 flex justify-between items-center bg-black/40">
+                <h3 class="text-lg font-bold text-white"><i class="fa-solid fa-bell text-sky-500 mr-2"></i>Bildirimler</h3>
+                <button onclick="app.closeNotifications()" class="text-gray-400 hover:text-white transition-colors"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div id="notifications-list" class="overflow-y-auto p-2 custom-scrollbar flex-grow bg-black/20">
+                <!-- Bildirimler buraya yüklenecek -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Bildirimler İçin Canlı Toast Konteyneri (Sağ Alt Köşe) -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-[200] flex flex-col pointer-events-none"></div>
+
+    <!-- Custom Onay/Uyarı Modal -->
     <div id="custom-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
         <div class="glass-panel p-6 rounded-2xl shadow-2xl max-w-sm w-full border border-gray-700">
             <h3 id="modal-title" class="text-xl font-bold mb-3 museum-font text-white flex items-center gap-2"></h3>
             <p id="modal-desc" class="text-gray-300 mb-6 text-sm leading-relaxed"></p>
+            
+            <div id="modal-input-container" class="hidden mb-6">
+                <input type="text" id="modal-input" class="w-full input-azure rounded-lg p-3 text-sm text-center font-bold tracking-widest placeholder-gray-500" autocomplete="off">
+                <p id="modal-input-error" class="text-red-400 text-xs mt-2 hidden text-center font-semibold"></p>
+            </div>
+
             <div id="modal-actions" class="flex justify-end gap-3">
                 <button id="modal-btn-cancel" class="px-4 py-2 rounded-lg bg-black/50 border border-gray-700 text-gray-300 hover:text-white hover:bg-black transition-colors text-sm">İptal</button>
                 <button id="modal-btn-confirm" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-500 transition-colors text-sm font-bold shadow-[0_0_10px_rgba(220,38,38,0.5)]">Onayla</button>
@@ -470,6 +507,9 @@
                     if (docSnap.exists()) {
                         this.currentUserProfile = { uid: docSnap.id, ...docSnap.data() };
                         this.updateNavUI();
+                        // Menüdeki Kırmızı Noktayı Hesaplamak için Article'ları tekrar okuyoruz
+                        if(this.articles.length > 0) this.updateNotificationBell();
+                        
                         if (this.currentView === 'profile') this.renderProfile();
                     } else {
                         this.logout();
@@ -628,6 +668,7 @@
                     nickname: nickname,
                     role: role,
                     avatarUrl: '',
+                    lastNotifRead: Date.now(), // Yeni kullanıcılar için sıfırla
                     createdAt: Date.now()
                 };
 
@@ -636,6 +677,11 @@
                 
                 await this.loadUserProfile({ uid: docRef.id });
                 this.showAuthLoading(false, "form-register");
+
+                if (role === 'viewer') {
+                    this.showAlert("Bilgilendirme", "İzleyici modundasınız, yazarlık yetkisi için adminle görüşün.");
+                }
+
             } catch (error) {
                 this.showAuthLoading(false, "form-register");
                 this.showAuthError("Kayıt başarısız: " + error.message);
@@ -647,6 +693,61 @@
             this.currentUserProfile = null;
             this.cleanupSubscriptions();
             this.navigate('auth');
+        },
+
+        promptDeleteAccount: function() {
+            const modal = document.getElementById('custom-modal');
+            const titleEl = document.getElementById('modal-title');
+            const descEl = document.getElementById('modal-desc');
+            const btnConfirm = document.getElementById('modal-btn-confirm');
+            const btnCancel = document.getElementById('modal-btn-cancel');
+            const inputContainer = document.getElementById('modal-input-container');
+            const inputEl = document.getElementById('modal-input');
+            const errorEl = document.getElementById('modal-input-error');
+
+            titleEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-red-500"></i> Hesabını Sil`;
+            descEl.innerHTML = `Hesabını silmek istiyor musun? Bu işlem geri alınamaz.<br><br><span class="text-xs text-gray-400">Onaylamak için aşağıdaki kutuya <b class="text-red-400">ONAYLIYORUM</b> yazın.</span>`;
+            
+            inputContainer.classList.remove('hidden');
+            inputEl.value = '';
+            inputEl.placeholder = 'ONAYLIYORUM';
+            errorEl.classList.add('hidden');
+            
+            btnCancel.classList.remove('hidden');
+            btnConfirm.textContent = "Kalıcı Olarak Sil";
+            btnConfirm.className = "px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-500 transition-colors text-sm font-bold shadow-[0_0_10px_rgba(220,38,38,0.5)]";
+            
+            modal.classList.remove('hidden');
+
+            const closeModal = () => {
+                modal.classList.add('hidden');
+                inputContainer.classList.add('hidden');
+            };
+            
+            btnCancel.onclick = closeModal;
+            
+            btnConfirm.onclick = async () => {
+                if (inputEl.value !== 'ONAYLIYORUM') {
+                    errorEl.textContent = "Lütfen tam olarak ONAYLIYORUM yazın.";
+                    errorEl.classList.remove('hidden');
+                    return;
+                }
+                
+                btnConfirm.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; 
+                btnConfirm.disabled = true;
+                
+                try {
+                    await deleteDoc(doc(this.usersCollection, this.currentUserProfile.uid));
+                    closeModal();
+                    this.logout();
+                } catch (error) { 
+                    errorEl.textContent = "Hesap silinirken hata oluştu."; 
+                    errorEl.classList.remove('hidden');
+                } finally { 
+                    btnConfirm.innerHTML = 'Kalıcı Olarak Sil'; 
+                    btnConfirm.disabled = false; 
+                }
+            };
         },
 
         handleAvatarSelect: function(event) {
@@ -798,14 +899,103 @@
 
         startListening: function() {
             if (this.unsubArticles) this.unsubArticles();
+            
+            let isInitialLoad = true;
+            
             this.unsubArticles = onSnapshot(this.articlesCollection, (snapshot) => {
+                const changes = snapshot.docChanges();
+                
+                // Canlı Toast Bildirimi (O an online olanlar için)
+                if (!isInitialLoad && this.currentUserProfile) {
+                    changes.forEach(change => {
+                        if (change.type === 'added') {
+                            const newArticle = change.doc.data();
+                            // Kendi eklediğimiz bildirimi kendimize gönderme
+                            if (newArticle.creatorId !== this.currentUserProfile.uid) {
+                                this.showToast('Bildirim', `"${newArticle.author}" yeni bir eser ekledi: ${newArticle.title}`, 'fa-bell', change.doc.id);
+                            }
+                        }
+                    });
+                }
+
+                // Makale Listesini Güncelle
                 this.articles = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 this.articles.sort((a, b) => b.createdAt - a.createdAt);
                 
+                // Çevrimdışı/Kalıcı bildirim çanı kırmızılığını güncelle
+                this.updateNotificationBell();
+
                 if (this.currentView === 'home') this.renderArticles(document.getElementById('search-input').value);
                 if (this.currentView === 'article') this.renderSingleArticle();
                 if (this.currentView === 'profile') this.renderProfile(); 
+                
+                isInitialLoad = false;
             });
+        },
+
+        updateNotificationBell: function() {
+            if(!this.currentUserProfile) return;
+            const lastRead = this.currentUserProfile.lastNotifRead || 0;
+            const hasUnread = this.articles.some(a => a.createdAt > lastRead && a.creatorId !== this.currentUserProfile.uid);
+            
+            const ping = document.getElementById('bell-dot-ping');
+            const stat = document.getElementById('bell-dot-static');
+            if (hasUnread) {
+                ping.classList.remove('hidden');
+                stat.classList.remove('hidden');
+            } else {
+                ping.classList.add('hidden');
+                stat.classList.add('hidden');
+            }
+        },
+
+        openNotifications: async function() {
+            if(!this.currentUserProfile) return;
+            
+            const modal = document.getElementById('notifications-modal');
+            const list = document.getElementById('notifications-list');
+            list.innerHTML = '';
+            
+            // Başkalarının eklediği son 15 eser
+            const recentArticles = this.articles.filter(a => a.creatorId !== this.currentUserProfile.uid).slice(0, 15);
+            
+            if (recentArticles.length === 0) {
+                list.innerHTML = '<p class="text-gray-400 text-sm p-4 text-center italic">Henüz hiç bildirim yok.</p>';
+            } else {
+                recentArticles.forEach(a => {
+                    const isNew = a.createdAt > (this.currentUserProfile.lastNotifRead || 0);
+                    const bgClass = isNew ? 'bg-sky-900/30 border-sky-800' : 'bg-transparent border-gray-800';
+                    const iconColor = isNew ? 'text-sky-400' : 'text-gray-500';
+                    
+                    list.innerHTML += `
+                        <div class="p-3 mb-2 rounded-xl border cursor-pointer hover:bg-white/10 transition-colors ${bgClass}" onclick="app.closeNotifications(); app.navigate('article', '${a.id}')">
+                            <div class="flex gap-3 items-start">
+                                <div class="mt-1 ${iconColor}"><i class="fa-solid fa-file-lines"></i></div>
+                                <div>
+                                    <p class="text-sm text-gray-200"><strong>${this.escapeHTML(a.author)}</strong> yeni bir eser ekledi: <span class="text-sky-300">"${this.escapeHTML(a.title)}"</span></p>
+                                    <span class="text-xs text-gray-500 mt-1 block">${this.formatTimeAgo(a.createdAt)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            
+            modal.classList.remove('hidden');
+            
+            // Okundu olarak işaretle
+            try {
+                const now = Date.now();
+                await updateDoc(doc(this.usersCollection, this.currentUserProfile.uid), { lastNotifRead: now });
+                this.currentUserProfile.lastNotifRead = now;
+                this.updateNotificationBell();
+            } catch(e) { console.error("Bildirim okundu hatası:", e); }
+        },
+
+        closeNotifications: function(e) {
+            // Eğer dış arka plana (modal zeminine) veya X'e tıklandıysa kapat
+            if(e && e.target.id !== 'notifications-modal') return; 
+            document.getElementById('notifications-modal').classList.add('hidden');
         },
 
         cleanupSubscriptions: function() {
@@ -913,7 +1103,8 @@
                 filtered = filtered.filter(a => 
                     a.title.toLowerCase().includes(term) || 
                     a.content.toLowerCase().includes(term) ||
-                    a.author.toLowerCase().includes(term)
+                    a.author.toLowerCase().includes(term) ||
+                    (a.tags && a.tags.some(tag => tag.toLowerCase().includes(term)))
                 );
             }
 
@@ -928,7 +1119,6 @@
             if (filtered.length === 0) {
                 grid.classList.add('hidden');
                 emptyState.classList.remove('hidden');
-                emptyState.querySelector('h3').textContent = (searchTerm || this.activeTagFilter) ? 'Aramanıza uygun eser bulunamadı.' : 'Arşivde Hiçbir Kayıt Yok';
                 return;
             }
 
@@ -1154,7 +1344,6 @@
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-white/5 transition-colors";
 
-                // Tarih formatlama işlemi
                 let dateFormatted = "Bilinmiyor";
                 if (user.createdAt) {
                     const d = new Date(user.createdAt);
@@ -1211,12 +1400,19 @@
         confirmAction: function(title, desc, onConfirm) {
             const modal = document.getElementById('custom-modal');
             const btnConfirm = document.getElementById('modal-btn-confirm');
+            const btnCancel = document.getElementById('modal-btn-cancel');
+            
             document.getElementById('modal-title').innerHTML = `<i class="fa-solid fa-circle-exclamation text-red-500"></i> ${title}`;
-            document.getElementById('modal-desc').textContent = desc;
+            document.getElementById('modal-desc').innerHTML = desc;
+            
+            if (document.getElementById('modal-input-container')) {
+                document.getElementById('modal-input-container').classList.add('hidden');
+            }
+            
             modal.classList.remove('hidden');
 
             const closeModal = () => modal.classList.add('hidden');
-            document.getElementById('modal-btn-cancel').onclick = closeModal;
+            btnCancel.onclick = closeModal;
             
             btnConfirm.onclick = async () => {
                 btnConfirm.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; btnConfirm.disabled = true;
@@ -1234,6 +1430,10 @@
             document.getElementById('modal-title').innerHTML = `<i class="fa-solid fa-circle-info text-sky-500"></i> ${title}`;
             document.getElementById('modal-desc').textContent = desc;
             
+            if (document.getElementById('modal-input-container')) {
+                document.getElementById('modal-input-container').classList.add('hidden');
+            }
+            
             btnCancel.classList.add('hidden'); 
             btnConfirm.textContent = "Tamam";
             btnConfirm.className = "px-6 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-500 transition-colors text-sm font-bold";
@@ -1244,6 +1444,51 @@
                 btnCancel.classList.remove('hidden');
                 btnConfirm.className = "px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-500 transition-colors text-sm font-bold shadow-[0_0_10px_rgba(220,38,38,0.5)]";
             };
+        },
+
+        showToast: function(title, message, iconClass = 'fa-circle-info', articleId = null) {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+
+            const toast = document.createElement('div');
+            // pointer-events-auto ekledik tıklanabilsin diye
+            toast.className = `glass-panel pointer-events-auto p-4 rounded-xl shadow-[0_0_20px_rgba(14,165,233,0.4)] border-l-4 border-l-sky-500 flex items-start gap-3 transform transition-all duration-500 translate-y-20 opacity-0 mb-3`;
+            
+            if (articleId) {
+                toast.classList.add('cursor-pointer', 'hover:bg-sky-900/40');
+                toast.onclick = () => {
+                    this.navigate('article', articleId);
+                    toast.remove();
+                };
+            }
+
+            toast.innerHTML = `
+                <div class="mt-0.5 bg-sky-900/50 text-sky-400 w-8 h-8 rounded-full flex items-center justify-center shrink-0">
+                    <i class="fa-solid ${iconClass}"></i>
+                </div>
+                <div class="flex-grow">
+                    <h4 class="text-white font-bold text-sm">${this.escapeHTML(title)}</h4>
+                    <p class="text-gray-300 text-xs mt-1 leading-relaxed">${this.escapeHTML(message)}</p>
+                </div>
+                <button class="text-gray-500 hover:text-white ml-2 transition-colors focus:outline-none" onclick="event.stopPropagation(); this.parentElement.remove()">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            `;
+            
+            container.appendChild(toast);
+            
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    toast.classList.remove('translate-y-20', 'opacity-0');
+                });
+            });
+
+            setTimeout(() => {
+                if (document.body.contains(toast)) {
+                    toast.classList.add('opacity-0', 'translate-x-10');
+                    setTimeout(() => toast.remove(), 500);
+                }
+            }, 6000);
         },
 
         escapeHTML: function(str) {
