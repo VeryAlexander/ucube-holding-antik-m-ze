@@ -283,7 +283,7 @@
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="bg-black/40 text-gray-300 text-sm uppercase tracking-wider">
-                                <th class="p-4 border-b border-gray-800">Kullanıcı (Rumuz)</th>
+                                <th class="p-4 border-b border-gray-800">Kullanıcı</th>
                                 <th class="p-4 border-b border-gray-800">Kayıt Tarihi</th>
                                 <th class="p-4 border-b border-gray-800">Yetki Rolü</th>
                                 <th class="p-4 border-b border-gray-800 text-right">İşlem</th>
@@ -355,7 +355,7 @@
 
                     <div>
                         <label class="block text-sm font-medium text-gray-300 mb-1 ml-1">Etiketler (Virgülle Ayırın)</label>
-                        <input type="text" id="edit-tags" placeholder="Örn: Kurgu/Gerçek, Mekan, vb." class="w-full input-azure rounded-xl p-4 text-sm font-medium placeholder-gray-600">
+                        <input type="text" id="edit-tags" placeholder="Örn: Olay, Mekan, Kişi" class="w-full input-azure rounded-xl p-4 text-sm font-medium placeholder-gray-600">
                     </div>
                     
                     <div>
@@ -370,7 +370,7 @@
                             <span>Tarihçe / Detaylar</span>
                             <span class="text-xs text-sky-400 bg-sky-900/30 px-2 py-1 rounded-md border border-sky-800/50"><i class="fa-brands fa-markdown"></i> Markdown Destekli</span>
                         </label>
-                        <textarea id="edit-content" rows="12" placeholder="O gün yaşananları tüm detaylarıyla tarihe not düşün... &#10;&#10;**Kalın Yazı** veya *İtalik* kullanabilirsiniz.&#10;Dışarıdan resim eklemek için: ![Açıklama](Resim_Linki_Buraya)&#10;Madde işareti için satır başına - (tire) koyun." class="w-full input-azure rounded-xl p-4 resize-y font-sans leading-relaxed placeholder-gray-600"></textarea>
+                        <textarea id="edit-content" rows="12" placeholder="İçeriği buraya detaylı şekilde yaz. &#10;&#10;**Kalın Yazı** veya *İtalik* kullanabilirsin.&#10;Madde işareti için satır başına - koyun." class="w-full input-azure rounded-xl p-4 resize-y font-sans leading-relaxed placeholder-gray-600"></textarea>
                     </div>
 
                     <div id="editor-error" class="hidden bg-red-900/40 border border-red-500/50 text-red-200 p-4 rounded-xl text-sm"></div>
@@ -507,7 +507,15 @@
                 
                 this.unsubCurrentUser = onSnapshot(userDocRef, (docSnap) => {
                     if (docSnap.exists()) {
-                        this.currentUserProfile = { uid: docSnap.id, ...docSnap.data() };
+                        const data = docSnap.data();
+                        
+                        // Geçici adminlik süresi doldu mu kontrolü
+                        if (data.role === 'admin' && data.adminExpiresAt && data.adminExpiresAt < Date.now()) {
+                            updateDoc(userDocRef, { role: 'editor', adminExpiresAt: null });
+                            return; // Bir sonraki snapshot güncel haliyle gelecek
+                        }
+
+                        this.currentUserProfile = { uid: docSnap.id, ...data };
                         this.updateNavUI();
                         // Menüdeki Kırmızı Noktayı Hesaplamak için Article'ları tekrar okuyoruz
                         if(this.articles.length > 0) this.updateNotificationBell();
@@ -539,6 +547,11 @@
             if (!this.currentUserProfile) {
                 actions.classList.add('hidden');
                 return;
+            }
+
+            // Eğer geçici adminlik süresi bittiyse ve kişi admin sayfasındaysa, zorla anasayfaya at
+            if (this.currentUserProfile.role !== 'admin' && this.currentView === 'admin') {
+                this.navigate('home');
             }
 
             actions.classList.remove('hidden');
@@ -1328,6 +1341,14 @@
             this.unsubUsers = onSnapshot(this.usersCollection, (snapshot) => {
                 this.allUsers = snapshot.docs.map(doc => ({ uid: doc.id, id: doc.id, ...doc.data() }));
                 this.allUsers.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+                
+                // Geçici adminlerin süresi dolmuş mu kontrol et ve yazar yap
+                this.allUsers.forEach(user => {
+                    if (user.role === 'admin' && user.adminExpiresAt && user.adminExpiresAt < Date.now()) {
+                        updateDoc(doc(this.usersCollection, user.uid), { role: 'editor', adminExpiresAt: null }).catch(e=>e);
+                    }
+                });
+
                 this.renderAdminTable();
             });
         },
@@ -1338,7 +1359,8 @@
             const roleOptions = [
                 { value: 'viewer', label: 'İzleyici (Sadece Okur)' },
                 { value: 'editor', label: 'Yazar (Eser Ekleyebilir)' },
-                { value: 'admin', label: 'Yönetici (Tam Yetki)' }
+                { value: 'admin', label: 'Yönetici (Tam Yetki)' },
+                { value: 'temp_admin', label: 'Geçici Yönetici (30 Dk)' }
             ];
 
             this.allUsers.forEach(user => {
@@ -1354,13 +1376,32 @@
                     dateFormatted = `${datePart}, ${timePart}`;
                 }
 
-                let roleSelectHTML = `<select class="input-azure rounded px-2 py-1 text-sm border-gray-700 w-full" onchange="app.changeUserRole('${user.uid}', this.value)" ${isMe ? 'disabled' : ''}>`;
-                roleOptions.forEach(opt => { roleSelectHTML += `<option value="${opt.value}" ${user.role === opt.value ? 'selected' : ''}>${opt.label}</option>`; });
+                const isTempAdmin = user.role === 'admin' && user.adminExpiresAt && user.adminExpiresAt > Date.now();
+
+                let roleSelectHTML = `<select class="input-azure rounded px-2 py-1 text-sm border-gray-700 w-full mb-1" onchange="app.changeUserRole('${user.uid}', this.value)" ${isMe ? 'disabled' : ''}>`;
+                roleOptions.forEach(opt => { 
+                    let isSelected = false;
+                    if (opt.value === 'temp_admin' && isTempAdmin) isSelected = true;
+                    else if (opt.value === user.role && !isTempAdmin && opt.value !== 'temp_admin') isSelected = true;
+                    
+                    roleSelectHTML += `<option value="${opt.value}" ${isSelected ? 'selected' : ''}>${opt.label}</option>`; 
+                });
                 roleSelectHTML += `</select>`;
 
                 let roleBadgeColor = 'bg-gray-800 text-gray-300';
-                if(user.role === 'admin') roleBadgeColor = 'bg-red-900/50 text-red-300 border border-red-800';
+                let roleText = user.role.toUpperCase();
+
+                if(user.role === 'admin') {
+                    if (isTempAdmin) {
+                        roleBadgeColor = 'bg-purple-900/50 text-purple-300 border border-purple-800';
+                        roleText = 'GEÇİCİ ADMIN';
+                    } else {
+                        roleBadgeColor = 'bg-red-900/50 text-red-300 border border-red-800';
+                    }
+                }
                 if(user.role === 'editor') roleBadgeColor = 'bg-sky-900/50 text-sky-300 border border-sky-800';
+
+                let deleteBtnHTML = isMe ? '' : `<button onclick="app.adminDeleteUser('${user.uid}', '${this.escapeHTML(user.nickname)}')" class="bg-red-900/40 hover:bg-red-800/60 text-red-300 p-1.5 rounded transition-colors text-xs ml-2 border border-red-800/50" title="Kullanıcıyı Sil"><i class="fa-solid fa-trash-can"></i></button>`;
 
                 tr.innerHTML = `
                     <td class="p-4 border-b border-gray-800/50 font-medium text-white flex items-center gap-3">
@@ -1370,8 +1411,13 @@
                     <td class="p-4 border-b border-gray-800/50 text-gray-400 text-xs">
                         <i class="fa-regular fa-calendar-plus mr-1"></i> ${dateFormatted}
                     </td>
-                    <td class="p-4 border-b border-gray-800/50"><span class="text-xs px-2 py-1 rounded ${roleBadgeColor}">${user.role.toUpperCase()}</span></td>
-                    <td class="p-4 border-b border-gray-800/50 text-right w-48">${roleSelectHTML}</td>
+                    <td class="p-4 border-b border-gray-800/50"><span class="text-xs px-2 py-1 rounded ${roleBadgeColor}">${roleText}</span></td>
+                    <td class="p-4 border-b border-gray-800/50 text-right w-64">
+                        <div class="flex items-center justify-end">
+                            ${roleSelectHTML}
+                            ${deleteBtnHTML}
+                        </div>
+                    </td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -1380,11 +1426,25 @@
         changeUserRole: async function(uid, newRole) {
             if (uid === this.currentUserProfile.uid) return;
             try { 
-                await updateDoc(doc(this.usersCollection, uid), { role: newRole }); 
+                let updates = {};
+                if (newRole === 'temp_admin') {
+                    // Tam 30 dakika (30 * 60 * 1000 ms) geçerli olacak
+                    updates = { role: 'admin', adminExpiresAt: Date.now() + 30 * 60 * 1000 };
+                } else {
+                    updates = { role: newRole, adminExpiresAt: null };
+                }
+                await updateDoc(doc(this.usersCollection, uid), updates); 
                 this.showAlert("Başarılı", "Kullanıcı yetkisi başarıyla güncellendi.");
             } catch (error) { 
                 this.showAlert("Hata", "Yetki değiştirilemedi."); 
             }
+        },
+
+        adminDeleteUser: function(uid, nickname) {
+            this.confirmAction("Kullanıcıyı Sil", `"${nickname}" adlı kullanıcının hesabını kalıcı olarak silmek istediğinize emin misiniz? (Sadece hesabı gider, eklediği yazılar kalır.)`, async () => {
+                await deleteDoc(doc(this.usersCollection, uid));
+                this.showToast("Başarılı", "Kullanıcı başarıyla silindi.", "fa-check");
+            });
         },
 
         formatTimeAgo: function(timestamp) {
